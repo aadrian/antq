@@ -53,6 +53,25 @@
               {:digit-before? (some? before)
                :word (str/lower-case run)}))))
 
+(defn- digits?
+  [s n]
+  (and (= n (count s))
+       (every? digit? s)))
+
+(defn timestamped-snapshot?
+  "Maven's timestamped snapshot: `<version>-yyyyMMdd.HHmmss-<build number>`
+  e.g. \"2.5-20240101.120000-1\" => true"
+  [s]
+  (let [[build timestamp] (reverse (str/split s #"-"))
+        [date time] (some-> timestamp (str/split #"\."))]
+    (boolean (and build
+                  (seq build)
+                  (every? digit? build)
+                  date
+                  (digits? date 8)
+                  time
+                  (digits? time 6)))))
+
 (defmulti normalize-latest-version
   (fn [dep] (:type dep)))
 

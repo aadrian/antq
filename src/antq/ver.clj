@@ -38,7 +38,8 @@
   [s]
   (if (and s
            (string? s))
-    (str/includes? (str/lower-case s) "snapshot")
+    (or (str/includes? (str/lower-case s) "snapshot")
+        (u.ver/timestamped-snapshot? s))
     false))
 
 (defmulti get-sorted-versions
