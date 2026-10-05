@@ -19,7 +19,7 @@ Running Gradle is riskier than parsing a file.
 Gradle runs the build's scripts and plugins, and the Gradle wrapper may download a Gradle distribution.
 Only run antq on Gradle projects you trust, as you would only run `./gradlew build` on projects you trust.
 
-To stop antq from running Gradle, use `--skip=gradle`.
+As such, checking Gradle dependencies is opt-in via `--check-gradle`.
 ====
 
 == Requirements
@@ -38,7 +38,7 @@ Run it in the project directory as for any other project, e.g. as a https://cloj
 
 [source,sh]
 ----
-clojure -Tantq outdated
+clojure -Tantq outdated :check-gradle true
 ----
 
 [[repositories]]
@@ -106,7 +106,7 @@ dependencies {
 tasks.register('outdated', JavaExec) {
   classpath = configurations.antq
   mainClass = 'clojure.main'
-  args = ['-m', 'antq.core', '--exclude=com.github.liquidz/antq']
+  args = ['-m', 'antq.core', '--exclude=com.github.liquidz/antq', '--check-gradle']
 }
 ----
 
