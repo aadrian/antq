@@ -32,9 +32,10 @@
   {:malli/schema [:=>
                   [:cat 'string? 'string?]
                   r/?dependencies]}
-  [file-path workflow-content-str]
+  [file-path file-content-str]
   (let [deps (atom [])
-        parsed (yaml/parse-string workflow-content-str)]
+        parsed (yaml/parse-string file-content-str)]
+    ;; workflow
     (doseq [[job-name job-body] (:jobs parsed)]
       (walk/prewalk (fn [form]
                       (when-let [deps* (seq (detect-deps form))]
@@ -43,10 +44,36 @@
                              (swap! deps concat)))
                       form)
                     job-body))
+    ;; composite action
+    (walk/prewalk (fn [form]
+                    (when-let [deps* (seq (detect-deps form))]
+                      (swap! deps concat deps*))
+                    form)
+                  (:runs parsed))
     (map #(assoc %
                  :project :github-action
                  :file file-path)
          @deps)))
+
+(defn- load-workflow-deps
+  [dir]
+  (let [dir-file (io/file dir ".github" "workflows")]
+    (when (.isDirectory dir-file)
+      (->> (file-seq dir-file)
+           (filter #(and (.isFile ^File %)
+                         (re-seq #"\.ya?ml$" (.getName %))))
+           (mapcat #(extract-deps (u.dep/relative-path %)
+                                  (slurp %)))))))
+
+(defn- load-action-deps
+  [dir]
+  (let [dir-file (io/file dir ".github" "actions")]
+    (when (.isDirectory dir-file)
+      (->> (file-seq dir-file)
+           (filter #(and (.isFile ^File %)
+                         (re-seq #"^action\.ya?ml$" (.getName %))))
+           (mapcat #(extract-deps (u.dep/relative-path %)
+                                  (slurp %)))))))
 
 (defn load-deps
   {:malli/schema [:function
@@ -54,10 +81,7 @@
                   [:=> [:cat 'string?] [:maybe r/?dependencies]]]}
   ([] (load-deps "."))
   ([dir]
-   (let [dir-file (io/file dir ".github" "workflows")]
-     (when (.isDirectory dir-file)
-       (->> (file-seq dir-file)
-            (filter #(and (.isFile ^File %)
-                          (re-seq #"\.ya?ml$" (.getName %))))
-            (mapcat #(extract-deps (u.dep/relative-path %)
-                                   (slurp %))))))))
+   (not-empty
+    (concat
+     (load-workflow-deps dir)
+     (load-action-deps dir)))))
