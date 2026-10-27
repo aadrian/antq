@@ -5,6 +5,7 @@
    [antq.upgrade :as sut]
    [antq.util.exception :as u.ex]
    [clojure.java.io :as io]
+   [clojure.string :as str]
    [clojure.test :as t]))
 
 (def temp-files
@@ -54,6 +55,23 @@
     (t/is (= "afterLATEST" (slurp temp1)))
     (t/is (= "before1" (slurp temp2)))
     (t/is (= "before2" (slurp temp3)))))
+
+(t/deftest upgrade!-cooldown-test
+  (let [[temp1 temp2 temp3] temp-files
+        two-days-ago (str (.minus (java.time.Instant/now) (java.time.Duration/ofDays 2)))
+        dep {:project ::test :name "foo" :latest-version "3" :cooldown-days 7}
+        out (with-out-str
+              (sut/upgrade! [(r/map->Dependency (assoc dep :file temp1 :cooldown-version "2"
+                                                       :latest-released-at two-days-ago))
+                             (r/map->Dependency (assoc dep :file temp2 :name "bar" :cooldown-version nil))
+                             (r/map->Dependency (assoc dep :file temp3 :name "baz" :cooldown-version "3"))]
+                            {:force true}))]
+    (t/is (= "after2" (slurp temp1)))
+    (t/is (= "before1" (slurp temp2)))
+    (t/is (= "after3" (slurp temp3)))
+    (t/is (= ["Skipped foo 3 (2d old, cooldown 7 days)"
+              "Skipped bar 3 (no release date, cooldown 7 days)"]
+             (filter #(str/starts-with? % "Skipped") (str/split-lines out))))))
 
 (t/deftest upgrade!-unsupported-test
   (let [[temp1] temp-files

@@ -6,6 +6,7 @@
    [antq.report :as report]
    [antq.util.exception :as u.ex]
    [antq.util.file :as u.file]
+   [antq.util.report :as u.report]
    [clojure.string :as str]))
 
 (defmulti upgrader
@@ -53,6 +54,20 @@
     :else
     dep))
 
+(defn- apply-cooldown
+  "Upgrades to the cooldown version and reports the newer version that is skipped."
+  [{:as dep :keys [cooldown-days cooldown-version latest-version latest-released-at]}]
+  (if cooldown-days
+    (do (when (not= cooldown-version latest-version)
+          (log/info (format "Skipped %s %s (%s, cooldown %d days)"
+                            (:name dep) latest-version
+                            (if latest-released-at
+                              (str (u.report/age latest-released-at) " old")
+                              "no release date")
+                            cooldown-days)))
+        (assoc dep :latest-version cooldown-version))
+    dep))
+
 (defn upgrade!
   "Return a map as follows.
   {true [upgraded-deps] false [non-upgraded deps]}"
@@ -60,6 +75,7 @@
   (let [force? (or (:force options) false)
         download? (or (:download options) false)
         version-checked-deps (->> deps
+                                  (map apply-cooldown)
                                   (filter (comp (complement u.ex/ex-timeout?)
                                                 :latest-version))
                                   (map normalize-version))]
