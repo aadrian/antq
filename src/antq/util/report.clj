@@ -1,6 +1,18 @@
 (ns ^:no-doc antq.util.report
   (:require
-   [antq.record :as r]))
+   [antq.record :as r])
+  (:import
+   (java.time
+    Duration
+    Instant)))
+
+(defn age
+  "Returns how long ago the ISO-8601 `date` was, e.g. `14h` or `3d`."
+  [date]
+  (let [hours (max 0 (.toHours (Duration/between (Instant/parse date) (Instant/now))))]
+    (if (< hours 24)
+      (str hours "h")
+      (str (quot hours 24) "d"))))
 
 (defn skip-duplicated-file-name
   {:malli/schema [:=> [:cat r/?dependencies] r/?dependencies]}

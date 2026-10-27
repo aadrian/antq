@@ -23,6 +23,33 @@
     (t/is (some #(and (str/includes? % "old") (str/includes? % "new")) outputs))
     (t/is (some #(str/includes? % "here") outputs))
 
+    (t/testing "no release dates, no age or cooldown columns"
+      (t/is (not (str/includes? (first outputs) "age"))))
+
     ;; no outdated deps
     (t/is (str/includes? (with-out-str (reporter []))
                          "All dependencies are up-to-date"))))
+
+(defn- days-ago
+  [n]
+  (str (.minus (java.time.Instant/now) (java.time.Duration/ofDays n))))
+
+(defn- cells
+  [row]
+  (mapv str/trim (rest (str/split row #"\|"))))
+
+(t/deftest reporter-cooldown-test
+  (let [deps [(h/test-dep {:file "a" :name "foo" :version "1" :latest-version "3"
+                           :released-at (days-ago 40) :latest-released-at (days-ago 2)
+                           :cooldown-days 7 :cooldown-version "2"})
+              (h/test-dep {:file "a" :name "bar" :version "1" :latest-version "2"
+                           :released-at (days-ago 9) :latest-released-at nil
+                           :cooldown-days 7 :cooldown-version nil})
+              (h/test-dep {:file "a" :name "baz" :version "1" :latest-version "2"})]
+        [header _ & rows] (str/split-lines (with-out-str (reporter deps)))]
+    (t/is (= [":file" ":name" ":current" ":latest" ":current-age" ":latest-age" ":cooldown-version" ":cooldown-days"]
+             (cells header)))
+    (t/is (= [["a" "bar" "1" "2" "9d" "" "" "7"]
+              ["" "baz" "1" "2" "" "" "" ""]
+              ["" "foo" "1" "3" "40d" "2d" "2" "7"]]
+             (map cells (take 3 rows))))))
