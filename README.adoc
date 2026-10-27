@@ -445,6 +445,29 @@ With this option, the number of reported dependencies tends to be very large, so
 Otherwise, it may take a long time for the results to be reported.
 ====
 
+[[opt-cooldown]]
+=== --cooldown=DAYS
+
+Only suggest versions released at least `DAYS` days ago.
+A cooldown gives time to spot a broken or compromised release before it reaches your project.
+Disabled by default (`0`).
+
+For Maven dependencies, the table always shows the age of the current and latest versions (`:current-age`, `:latest-age`).
+With this option, it also shows:
+
+* `:cooldown-version`: the newest version released at least `DAYS` days ago, empty if all newer versions are too new
+* `:cooldown-days`: the cooldown period
+
+<<opt-upgrade>> upgrades to `:cooldown-version` and prints the newer versions it skipped.
+A dependency whose newer versions are all inside the cooldown is still reported, but does not make antq exit with `1`.
+
+[NOTE]
+====
+A release date is the `Last-Modified` header of the version's POM file, so the cooldown applies to Maven dependencies only.
+A version whose release date can't be read counts as too new.
+Mirrors and proxies (e.g. Nexus, Artifactory) may report when they cached a file instead of its release date, which makes the cooldown longer.
+====
+
 == Projects using antq
 
 * https://github.com/nnichols/clojure-dependency-update-action[clojure-dependency-update-action]: A simple GitHub Actions to create Pull Requests for outdated tools.deps dependencies
