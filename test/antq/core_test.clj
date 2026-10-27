@@ -9,13 +9,18 @@
    [antq.util.dep :as u.dep]
    [antq.util.exception :as u.ex]
    [antq.util.git :as u.git]
+   [antq.util.maven :as u.maven]
    [antq.util.os :as os]
    [antq.ver :as ver]
    [babashka.fs :as fs]
    [clojure.string :as str]
    [clojure.test :as t]
    [matcher-combinators.matchers :as m]
-   [matcher-combinators.test]))
+   [matcher-combinators.test])
+  (:import
+   (java.time
+    Duration
+    Instant)))
 
 (defmethod ver/get-sorted-versions :test
   [_ _]
@@ -136,6 +141,78 @@
     (t/testing "focus containing specific version, should force it (0.5.0) even when newer exists (3.0.0)"
       (t/is (= [(test-dep {:name "alice" :version "1.0.0" :latest-version "0.5.0" :forced-version "0.5.0"})]
                (sut/outdated-deps deps {:focus ["alice@0.5.0"]}))))))
+
+(defn- days-ago
+  [n]
+  (.minus (Instant/now) (Duration/ofMinutes (long (* n 24 60)))))
+
+(t/deftest outdated-deps-cooldown-test
+  (let [dates {"4.0.0" (days-ago 1) "3.0.0" (days-ago 5) "2.0.0" (days-ago 30) "1.0.0" (days-ago 100)}
+        looked-up (atom [])
+        dep (r/map->Dependency {:type :java :name "foo/bar" :version "1.0.0"})
+        outdated (fn [options & {:keys [deps dates] :or {deps [dep] dates dates}}]
+                   (reset! looked-up [])
+                   (with-redefs [ver/get-sorted-versions (constantly ["4.0.0" "3.0.0" "2.0.0" "1.0.0"])
+                                 u.maven/release-date (fn [_ _ v] (swap! looked-up conj v) (get dates v))]
+                     (sut/outdated-deps deps options)))]
+
+    (t/testing "release dates are added without cooldown"
+      (t/is (match? [{:latest-version "4.0.0"
+                      :released-at (str (dates "1.0.0"))
+                      :latest-released-at (str (dates "4.0.0"))
+                      :cooldown-days m/absent
+                      :cooldown-version m/absent}]
+                    (outdated {})))
+      (t/is (match? [{:cooldown-days m/absent}] (outdated {:cooldown 0}))))
+
+    (t/testing "the newest version outside the cooldown is picked"
+      (t/is (match? [{:latest-version "4.0.0" :cooldown-days 7 :cooldown-version "2.0.0"}]
+                    (outdated {:cooldown 7})))
+      (t/is (match? [{:cooldown-version "3.0.0"}] (outdated {:cooldown 3})))
+      (t/testing "and older versions are not looked up"
+        (t/is (not-any? #{"2.0.0"} @looked-up))))
+
+    (t/testing "all newer versions are inside the cooldown; the current version is not picked"
+      (t/is (match? [{:latest-version "4.0.0" :cooldown-version nil}] (outdated {:cooldown 50}))))
+
+    (t/testing "a version released exactly cooldown days ago passes"
+      (t/is (match? [{:cooldown-version "4.0.0"}]
+                    (outdated {:cooldown 7} :dates (assoc dates "4.0.0" (days-ago 7)))))
+      (t/is (match? [{:cooldown-version "3.0.0"}]
+                    (outdated {:cooldown 7} :dates (assoc dates
+                                                          "4.0.0" (.plusSeconds ^Instant (days-ago 7) 60)
+                                                          "3.0.0" (days-ago 8))))))
+
+    (t/testing "a version without release date counts as too new"
+      (t/is (match? [{:cooldown-version "2.0.0" :latest-released-at nil}]
+                    (outdated {:cooldown 3} :dates (dissoc dates "4.0.0" "3.0.0")))))
+
+    (t/testing "excluded versions are not picked"
+      (t/is (match? [{:cooldown-version nil}] (outdated {:cooldown 7 :exclude ["foo/bar@2.0.0"]}))))
+
+    (t/testing "a version forced with --focus ignores the cooldown"
+      (t/is (match? [{:latest-version "4.0.0" :cooldown-days m/absent}]
+                    (outdated {:cooldown 7 :focus ["foo/bar@4.0.0"]}))))
+
+    (t/testing "up-to-date deps are not looked up"
+      (t/is (empty? (outdated {:cooldown 7} :deps [(assoc dep :version "4.0.0")])))
+      (t/is (empty? @looked-up)))
+
+    (t/testing "non-Maven deps get no dates and no cooldown"
+      (t/is (match? [{:released-at m/absent :cooldown-days m/absent}]
+                    (outdated {:cooldown 7} :deps [(assoc dep :type :test)])))
+      (t/is (empty? @looked-up)))))
+
+(t/deftest exit-test
+  (let [held {:latest-version "2" :cooldown-days 7 :cooldown-version nil}
+        picked {:latest-version "2" :cooldown-days 7 :cooldown-version "2"}
+        exit-code #(with-redefs [sut/system-exit identity] (sut/exit %))]
+    (t/is (= 0 (exit-code [])))
+    (t/is (= 0 (exit-code [held held])))
+    (t/is (= 1 (exit-code [held picked])))
+    (t/is (= 1 (exit-code [{:latest-version "2"}])))
+    (t/testing "failed version lookup"
+      (t/is (= 1 (exit-code [{:latest-version nil}]))))))
 
 (defmethod ver/get-sorted-versions :test-pre-release
   [dep _]

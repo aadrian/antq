@@ -23,6 +23,10 @@
   - `only-newest-version?` _boolean_ keep only newest version in same file
   - `exclude-versions` _sequence of strings_ ignore version that match 
   - `parent` parent dependency name
+  - `released-at`, `latest-released-at` _string_ ISO-8601 release dates of `:version` and `:latest-version`,
+     Maven deps only (can be `nil`)
+  - `cooldown-days` _integer_ the `:cooldown` option, set for Maven deps when it is used
+  - `cooldown-version` _string_ newest version released at least `cooldown-days` ago (can be `nil`)
 
   Arguments: 
   - `deps-map` _required_ - A map of the same form as `:deps` in `deps.edn`, e.g.,

@@ -128,6 +128,12 @@
    {:coerce boolean
     :desc "Skip progress reporting"}
 
+   :cooldown
+   {:ref "<days>"
+    :coerce :long
+    :validate nat-int?
+    :desc "Only suggest Maven versions released at least this many days ago"}
+
    :usage-help-style
    {:coerce :keyword
     :default :cli
@@ -248,7 +254,7 @@
                      :order [:upgrade :force :exclude :directory :focus
                              :skip :error-format :reporter :no-progress :download :ignore-locals
                              :check-clojure-tools :check-gradle :no-changes :changes-in-table :transitive
-                             :verbose :help]})))
+                             :cooldown :verbose :help]})))
 
 (defn parse-args
   "Parses command line `args` and returns a map of:

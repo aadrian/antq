@@ -27,6 +27,7 @@
   - :no-changes          <boolean>
   - :changes-in-table    <boolean>
   - :transitive          <boolean>
+  - :cooldown            <integer>
   - :verbose             <boolean>
   - :help                <boolean> for full command-line style help"
   [options]

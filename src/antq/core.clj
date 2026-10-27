@@ -41,6 +41,7 @@
    [antq.upgrade.leiningen]
    [antq.upgrade.pom]
    [antq.upgrade.shadow]
+   [antq.util.dep :as u.dep]
    [antq.util.exception :as u.ex]
    [antq.util.file :as u.file]
    [antq.util.maven :as u.maven]
@@ -54,7 +55,10 @@
    [clojure.string :as str]
    [version-clj.core :as version])
   (:import
-   clojure.lang.ExceptionInfo))
+   clojure.lang.ExceptionInfo
+   (java.time
+    Duration
+    Instant)))
 
 (def ^:private disallowed-unverified-deps-map
   {"antq/antq" "com.github.liquidz/antq"
@@ -141,14 +145,39 @@
         (first)
         (log/info))))
 
+(defn- old-enough?
+  [^Instant date days]
+  (and date
+       (not (.isAfter date (.minus (Instant/now) (Duration/ofDays days))))))
+
+(defn- assoc-release-dates
+  "For outdated Maven deps, adds the release dates of the current and latest versions.
+  With `:cooldown`, also adds the newest version released at least that many days ago
+  (nil if there is none; versions without a release date are treated as too new)."
+  [{:as dep :keys [version latest-version]} vers {:keys [cooldown]}]
+  (if (and (= :java (:type dep))
+           (string? latest-version)
+           (not (ver/latest? dep)))
+    (let [repos (:repositories (u.dep/repository-opts dep))
+          date #(u.maven/release-date repos (:name dep) %)]
+      (cond-> (assoc dep
+                     :released-at (some-> (date version) str)
+                     :latest-released-at (some-> (date latest-version) str))
+        (and (pos-int? cooldown) (not (:forced-version dep)))
+        (assoc :cooldown-days cooldown
+               :cooldown-version (->> vers
+                                      (take-while #(pos? (version/version-compare % version)))
+                                      (some #(when (old-enough? (date %) cooldown) %))))))
+    dep))
+
 (defn- assoc-latest-version
   [dep options]
   (let [vers (cond->> (:_versions dep)
                (not (ver/under-development? (:version dep)))
                (drop-while ver/under-development?))
-        vers (remove-skipping-versions vers dep options)
-        latest-version (first vers)]
-    (assoc dep :latest-version latest-version)))
+        vers (remove-skipping-versions vers dep options)]
+    (-> (assoc dep :latest-version (first vers))
+        (assoc-release-dates vers options))))
 
 (defn- dissoc-no-longer-used-keys
   [dep]
@@ -190,9 +219,9 @@
         _ (report/deinit-progress uniq-deps options)
         assoc-latest-version* #(assoc-latest-version % options)
         version-checked-deps (->> org-deps
-                                  (pmap #(complete-versions-by % uniq-deps-with-vers))
-                                  (map (comp dissoc-no-longer-used-keys
-                                             assoc-latest-version*)))
+                                  (pmap (comp dissoc-no-longer-used-keys
+                                              assoc-latest-version*
+                                              #(complete-versions-by % uniq-deps-with-vers))))
         parent-dep-names (->> version-checked-deps
                               (remove ver/latest?)
                               (keep :parent)
@@ -230,9 +259,14 @@
   [n]
   (System/exit n))
 
+(defn- held-by-cooldown?
+  [dep]
+  (and (:cooldown-days dep)
+       (nil? (:cooldown-version dep))))
+
 (defn exit
   [outdated-deps]
-  (system-exit (if (seq outdated-deps) 1 0)))
+  (system-exit (if (some (complement held-by-cooldown?) outdated-deps) 1 0)))
 
 (defn fetch-deps
   [options]
