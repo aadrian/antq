@@ -161,19 +161,22 @@
                       :released-at (str (dates "1.0.0"))
                       :latest-released-at (str (dates "4.0.0"))
                       :cooldown-days m/absent
-                      :cooldown-version m/absent}]
+                      :cooldown-version m/absent
+                      :cooldown-released-at m/absent}]
                     (outdated {})))
       (t/is (match? [{:cooldown-days m/absent}] (outdated {:cooldown 0}))))
 
     (t/testing "the newest version outside the cooldown is picked"
-      (t/is (match? [{:latest-version "4.0.0" :cooldown-days 7 :cooldown-version "2.0.0"}]
+      (t/is (match? [{:latest-version "4.0.0" :cooldown-days 7 :cooldown-version "2.0.0"
+                      :cooldown-released-at (str (dates "2.0.0"))}]
                     (outdated {:cooldown 7})))
       (t/is (match? [{:cooldown-version "3.0.0"}] (outdated {:cooldown 3})))
       (t/testing "and older versions are not looked up"
         (t/is (not-any? #{"2.0.0"} @looked-up))))
 
     (t/testing "all newer versions are inside the cooldown; the current version is not picked"
-      (t/is (match? [{:latest-version "4.0.0" :cooldown-version nil}] (outdated {:cooldown 50}))))
+      (t/is (match? [{:latest-version "4.0.0" :cooldown-version nil :cooldown-released-at nil}]
+                    (outdated {:cooldown 50}))))
 
     (t/testing "a version released exactly cooldown days ago passes"
       (t/is (match? [{:cooldown-version "4.0.0"}]

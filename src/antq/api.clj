@@ -27,6 +27,7 @@
      Maven deps only (can be `nil`)
   - `cooldown-days` _integer_ the `:cooldown` option, set for Maven deps when it is used
   - `cooldown-version` _string_ newest version released at least `cooldown-days` ago (can be `nil`)
+  - `cooldown-released-at` _string_ ISO-8601 release date of `:cooldown-version` (can be `nil`)
 
   Arguments: 
   - `deps-map` _required_ - A map of the same form as `:deps` in `deps.edn`, e.g.,

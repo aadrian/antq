@@ -152,22 +152,26 @@
 
 (defn- assoc-release-dates
   "For outdated Maven deps, adds the release dates of the current and latest versions.
-  With `:cooldown`, also adds the newest version released at least that many days ago
-  (nil if there is none; versions without a release date are treated as too new)."
+  With `:cooldown`, also adds the newest version released at least that many days ago and its
+  release date (nil if there is none; versions without a release date are treated as too new)."
   [{:as dep :keys [version latest-version]} vers {:keys [cooldown]}]
   (if (and (= :java (:type dep))
            (string? latest-version)
            (not (ver/latest? dep)))
     (let [repos (:repositories (u.dep/repository-opts dep))
-          date #(u.maven/release-date repos (:name dep) %)]
+          date #(u.maven/release-date repos (:name dep) %)
+          cooldown? (and (pos-int? cooldown) (not (:forced-version dep)))
+          pick (when cooldown?
+                 (->> vers
+                      (take-while #(pos? (version/version-compare % version)))
+                      (some #(when (old-enough? (date %) cooldown) %))))]
       (cond-> (assoc dep
                      :released-at (some-> (date version) str)
                      :latest-released-at (some-> (date latest-version) str))
-        (and (pos-int? cooldown) (not (:forced-version dep)))
+        cooldown?
         (assoc :cooldown-days cooldown
-               :cooldown-version (->> vers
-                                      (take-while #(pos? (version/version-compare % version)))
-                                      (some #(when (old-enough? (date %) cooldown) %))))))
+               :cooldown-version pick
+               :cooldown-released-at (some-> pick date str))))
     dep))
 
 (defn- assoc-latest-version
