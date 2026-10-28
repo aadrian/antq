@@ -328,6 +328,21 @@ See details: https://github.com/clojars/clojars-web/wiki/Verified-Group-Names[Cl
 | `{{changes-url}}`
 | The changes URL in Version Control System. (Nullable)
 
+| `{{released-at}}`
+| The ISO-8601 release date of the current version, Maven dependencies only. (Nullable)
+
+| `{{latest-released-at}}`
+| The ISO-8601 release date of the latest version, Maven dependencies only. (Nullable)
+
+| `{{cooldown-version}}`
+| The newest version outside the <<opt-cooldown>> period. (Nullable)
+
+| `{{cooldown-released-at}}`
+| The ISO-8601 release date of the cooldown version. (Nullable)
+
+| `{{cooldown-days}}`
+| The <<opt-cooldown>> period in days. (Nullable)
+
 | `{{diff-url}}`
 | WARNING: DEPRECATED. +
 Please use `{{changes-url}}` instead.
@@ -452,13 +467,16 @@ Only suggest versions released at least `DAYS` days ago.
 A cooldown gives time to spot a broken or compromised release before it reaches your project.
 Disabled by default (`0`).
 
-For Maven dependencies, the table always shows the age of the current and latest versions (`:current-age`, `:latest-age`).
+For Maven dependencies, the table always shows the age of the current and latest versions in an `age` column next to each.
 With this option, it also shows:
 
-* `:cooldown-version`: the newest version released at least `DAYS` days ago, empty if all newer versions are too new
-* `:cooldown-days`: the cooldown period
+* `cooldown`: the newest version released at least `DAYS` days ago, empty if all newer versions are too new
+* `dur`: the cooldown period
+* `age`: the age of the cooldown version
 
-<<opt-upgrade>> upgrades to `:cooldown-version` and prints the newer versions it skipped.
+The `json` and `edn` reporters include `:released-at`, `:latest-released-at`, `:cooldown-version`, `:cooldown-released-at` and `:cooldown-days`, and <<opt-error-format>> can use them too.
+
+<<opt-upgrade>> upgrades to the cooldown version and prints the newer versions it skipped.
 A dependency whose newer versions are all inside the cooldown is still reported, but does not make antq exit with `1`.
 
 [NOTE]
