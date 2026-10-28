@@ -22,9 +22,20 @@
                       (expand-children parent-grouped-deps)
                       (concat [parent-dep]))))))
 
+(def ^:private column-labels
+  {:current-age "age"
+   :latest-age "age"
+   :cooldown-version "cooldown"
+   :cooldown-days "dur"
+   :cooldown-age "age"})
+
+(defn- column-label
+  [column]
+  (get column-labels column (name column)))
+
 (defn- calc-max-length
   [column-name deps]
-  (apply max (count (str column-name)) (map (comp count column-name) deps)))
+  (apply max (count (column-label column-name)) (map (comp count column-name) deps)))
 
 (defn- generate-row
   [dep columns max-lengths]
@@ -45,18 +56,17 @@
 
 (defn- print-table
   [options deps]
-  (let [columns (cond-> [:file :name :current :latest]
-                  (some (some-fn :current-age :latest-age) deps)
-                  (conj :current-age :latest-age)
-
+  (let [columns (cond-> (if (some (some-fn :current-age :latest-age) deps)
+                          [:file :name :current :current-age :latest :latest-age]
+                          [:file :name :current :latest])
                   (some :cooldown-days deps)
-                  (conj :cooldown-version :cooldown-days)
+                  (conj :cooldown-version :cooldown-days :cooldown-age)
 
                   (:changes-in-table options)
                   (conj :changes-url))
         max-lengths (map #(calc-max-length % deps) columns)]
     (println (generate-row (->> columns
-                                (map #(vector % (str %)))
+                                (map #(vector % (column-label %)))
                                 (into {}))
                            columns max-lengths))
     (println (->> max-lengths
@@ -81,7 +91,8 @@
            (map #(update % :file u.file/normalize-path))
            (map #(assoc % :current-age (some-> (:released-at %) u.report/age)
                         :latest-age (some-> (:latest-released-at %) u.report/age)
-                        :cooldown-days (some-> (:cooldown-days %) str)))
+                        :cooldown-age (some-> (:cooldown-released-at %) u.report/age)
+                        :cooldown-days (some-> (:cooldown-days %) (str "d"))))
            (map #(let [latest-key (if (seq (:latest-name %))
                                     :latest-name
                                     :latest-version)]
