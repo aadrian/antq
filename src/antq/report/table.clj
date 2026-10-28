@@ -56,14 +56,13 @@
 
 (defn- print-table
   [options deps]
-  (let [columns (cond-> (if (some (some-fn :current-age :latest-age) deps)
-                          [:file :name :current :current-age :latest :latest-age]
-                          [:file :name :current :latest])
-                  (some :cooldown-days deps)
-                  (conj :cooldown-version :cooldown-days :cooldown-age)
-
-                  (:changes-in-table options)
-                  (conj :changes-url))
+  (let [ages? (some (some-fn :current-age :latest-age) deps)
+        columns (concat [:file :name :current]
+                        (when ages? [:current-age])
+                        (when (some :cooldown-days deps) [:cooldown-version :cooldown-age :cooldown-days])
+                        [:latest]
+                        (when ages? [:latest-age])
+                        (when (:changes-in-table options) [:changes-url]))
         max-lengths (map #(calc-max-length % deps) columns)]
     (println (generate-row (->> columns
                                 (map #(vector % (column-label %)))
@@ -89,6 +88,11 @@
            (u.report/skip-duplicated-file-name)
            (map #(assoc % :latest-version (u.ver/normalize-latest-version %)))
            (map #(update % :file u.file/normalize-path))
+           ;; A dep held by the cooldown stays on its current version
+           (map #(cond-> %
+                   (and (:cooldown-days %) (nil? (:cooldown-version %)))
+                   (assoc :cooldown-version (:version %)
+                          :cooldown-released-at (:released-at %))))
            (map #(assoc % :current-age (some-> (:released-at %) u.report/age)
                         :latest-age (some-> (:latest-released-at %) u.report/age)
                         :cooldown-age (some-> (:cooldown-released-at %) u.report/age)

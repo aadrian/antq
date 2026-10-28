@@ -468,11 +468,11 @@ A cooldown gives time to spot a broken or compromised release before it reaches 
 Disabled by default (`0`).
 
 For Maven dependencies, the table always shows the age of the current and latest versions in an `age` column next to each.
-With this option, it also shows:
+With this option, it also shows between the current and latest versions:
 
-* `cooldown`: the newest version released at least `DAYS` days ago, empty if all newer versions are too new
-* `dur`: the cooldown period
+* `cooldown`: the newest version released at least `DAYS` days ago, or the current version if all newer versions are too new
 * `age`: the age of the cooldown version
+* `dur`: the cooldown period
 
 The `json` and `edn` reporters include `:released-at`, `:latest-released-at`, `:cooldown-version`, `:cooldown-released-at` and `:cooldown-days`, and <<opt-error-format>> can use them too.
 

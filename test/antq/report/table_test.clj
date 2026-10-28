@@ -66,8 +66,8 @@
                            :released-at (days-ago 9) :latest-released-at nil
                            :cooldown-days 7 :cooldown-version nil :cooldown-released-at nil})
               (h/test-dep {:file "a" :name "baz" :version "1" :latest-version "2"})]]
-    (t/is (= [["file" "name" "current" "age" "latest" "age" "cooldown" "dur" "age"]
-              ["a" "bar" "1" "9d" "2" "" "" "7d" ""]
-              ["" "baz" "1" "" "2" "" "" "" ""]
-              ["" "foo" "1" "40d" "3" "2d" "2" "7d" "9d"]]
+    (t/is (= [["file" "name" "current" "age" "cooldown" "age" "dur" "latest" "age"]
+              ["a" "bar" "1" "9d" "1" "9d" "7d" "2" ""]
+              ["" "baz" "1" "" "" "" "" "2" ""]
+              ["" "foo" "1" "40d" "2" "9d" "7d" "3" "2d"]]
              (take 4 (table deps))))))
